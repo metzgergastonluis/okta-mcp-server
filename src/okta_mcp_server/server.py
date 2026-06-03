@@ -33,15 +33,22 @@ async def okta_authorisation_flow(server: FastMCP) -> AsyncIterator[OktaAppConte
     """
     logger.info("Starting Okta authorization flow")
     manager = OktaAuthManager()
-    await manager.authenticate()
-    logger.info("Okta authentication completed successfully")
+    # Do NOT authenticate here. Authentication happens lazily on the first tool
+    # call (get_okta_client -> is_valid_token), so the MCP server connects
+    # instantly and never blocks startup on an interactive browser login.
+    # Blocking startup on device-auth previously let the client's startup
+    # timeout fire and restart the server mid-login, looping the prompt.
+    # Tool pruning only needs the requested OKTA_SCOPES, not a live token.
     prune_tools_by_scope(server, manager)
 
     try:
         yield OktaAppContext(okta_auth_manager=manager)
     finally:
-        logger.debug("Clearing Okta tokens")
-        manager.clear_tokens()
+        # Intentionally do NOT clear tokens on shutdown. Persisting the access
+        # and refresh tokens across process restarts is what lets a developer
+        # log in once instead of on every reconnect. Tokens live in a per-org,
+        # gitignored keyring file (see .mcp.json XDG_DATA_HOME).
+        logger.debug("Okta MCP server shutting down; cached tokens left in place")
 
 
 mcp = FastMCP("Okta IDaaS MCP Server", lifespan=okta_authorisation_flow)

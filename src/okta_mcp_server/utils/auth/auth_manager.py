@@ -22,6 +22,10 @@ from loguru import logger
 
 SERVICE_NAME = "OktaAuthManager"
 
+# Treat a token as expired this many seconds before its real exp so an in-flight
+# request never races the expiry boundary.
+TOKEN_EXPIRY_LEEWAY = 60
+
 
 @dataclass
 class OktaAuthManager:
@@ -316,18 +320,38 @@ class OktaAuthManager:
             else:
                 logger.error("Authentication failed")
 
+    def _token_seconds_remaining(self, api_token: str, expiry_duration: int) -> float:
+        """Return seconds until the cached access token expires.
+
+        Okta ``okta.*`` access tokens are JWTs, so we read their ``exp`` claim
+        directly. This survives process restarts, unlike ``self.token_timestamp``
+        which is reset to 0 every time the server process starts — the bug that
+        previously made every restart look like an expired token and forced a
+        fresh interactive login. Falls back to the in-memory timestamp heuristic
+        only if the token can't be decoded.
+        """
+        try:
+            claims = jwt.decode(api_token, options={"verify_signature": False})
+            exp = claims.get("exp")
+            if exp:
+                return float(exp) - time.time()
+        except jwt.PyJWTError as e:
+            logger.debug(f"Could not read exp from access token, falling back to timestamp: {e}")
+        if self.token_timestamp:
+            return (self.token_timestamp + expiry_duration) - time.time()
+        return 0.0
+
     async def is_valid_token(self, expiry_duration: int = 3600) -> bool:
         """Ensure that a valid token is available. Refresh or re-authenticate if needed."""
         logger.debug(f"Checking token validity (expiry duration: {expiry_duration}s)")
 
         api_token = keyring.get_password(SERVICE_NAME, "api_token")
-        token_age = time.time() - self.token_timestamp
 
-        if api_token and token_age < expiry_duration:
-            logger.debug(f"Token is valid (age: {token_age:.0f}s)")
+        if api_token and self._token_seconds_remaining(api_token, expiry_duration) > TOKEN_EXPIRY_LEEWAY:
+            logger.debug("Cached token is still valid")
             return True
 
-        logger.info(f"Token is expired or missing (age: {token_age:.0f}s)")
+        logger.info("Token is expired or missing")
         if self.use_browserless_auth:
             # For browserless auth, we can't refresh, so re-authenticate
             logger.info("Re-authenticating using browserless flow")
