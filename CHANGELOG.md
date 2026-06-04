@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 - Relaxed `Application.features` enum validation (`src/okta_mcp_server/utils/sdk_patches.py`, applied at startup in `main()`). okta SDK 3.4.1 rejects unknown feature values like `AUTO_CONFIRM_IMPORTS`, which made `list_applications` error or return zero apps against orgs using newer provisioning features. Re-evaluate this patch on any okta SDK bump.
+- Relaxed over-required `SamlApplicationSettingsSignOn` fields (same module). okta SDK 3.4.1 marks ~15 signOn fields (`audience`, `recipient`, `ssoAcsUrl`, ...) as required, but Okta returns SAML apps with only a partial signOn block, so `list_applications` still raised "Field required" after the enum fix alone. These fields are now optional.
 
 ### Improvements
 - Lazy authentication and token persistence across restarts (see plugin README "Session persistence").
