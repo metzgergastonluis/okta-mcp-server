@@ -138,6 +138,8 @@ def main():
     )
 
     logger.info("Starting Okta MCP Server")
+    from okta_mcp_server.utils.sdk_patches import apply_sdk_patches
+    apply_sdk_patches()
     from okta_mcp_server.tools.applications import applications  # noqa: F401
     from okta_mcp_server.tools.customization.brands import brands  # noqa: F401
     from okta_mcp_server.tools.customization.custom_domains import custom_domains  # noqa: F401
