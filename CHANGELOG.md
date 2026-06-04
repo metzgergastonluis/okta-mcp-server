@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## Springboard fork (branch sb/persist-token-lazy-auth)
+
+### Bug Fixes
+- Relaxed `Application.features` enum validation (`src/okta_mcp_server/utils/sdk_patches.py`, applied at startup in `main()`). okta SDK 3.4.1 rejects unknown feature values like `AUTO_CONFIRM_IMPORTS`, which made `list_applications` error or return zero apps against orgs using newer provisioning features. Re-evaluate this patch on any okta SDK bump.
+
+### Improvements
+- Lazy authentication and token persistence across restarts (see plugin README "Session persistence").
+
 ## v1.1.0
 
 ### Features
