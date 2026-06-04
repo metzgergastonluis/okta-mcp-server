@@ -38,6 +38,7 @@ def apply_sdk_patches() -> None:
             logger.warning(
                 "okta SDK Application.features_validate_enum not found; "
                 "skipping SDK patch (SDK layout may have changed)"
+                " Apps with unknown feature values will still fail to parse."
             )
             _PATCHED = True
             return
@@ -46,6 +47,6 @@ def apply_sdk_patches() -> None:
         func.__code__ = _passthrough_features_validate_enum.__code__
         logger.debug("Applied okta SDK patch: relaxed Application.features enum validation")
     except Exception as exc:  # never let a patch failure crash server startup
-        logger.warning(f"Failed to apply okta SDK patch: {type(exc).__name__}: {exc}")
+        logger.warning(f"Failed to apply okta SDK patch: {type(exc).__name__}: {exc} Validator left unpatched; apps with unknown feature values will still fail to parse.")
 
     _PATCHED = True
